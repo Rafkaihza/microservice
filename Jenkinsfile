@@ -2,48 +2,49 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub'
-        IMAGE_NAME = 'rafkaihza/micro-frontend'
-        K8S_NAMESPACE = 'ecommerce'
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred-id') // id di Jenkins
+        DOCKER_REPO = 'rafkaihza78'
+        KUBE_CONTEXT = 'minikube'
+        HELM_RELEASE = 'onlineboutique'
+        HELM_CHART_PATH = './release'
+        NAMESPACE = 'ecommerce'
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Checkout') {
             steps {
-                git 'https://github.com/GoogleCloudPlatform/microservices-demo.git'
+                git branch: 'main', url: 'https://github.com/USERNAME/microservices-demo.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Docker Images') {
             steps {
-                script {
-                    dir('src/frontend') {
-                        sh """
-                        docker build -t ${IMAGE_NAME}:latest .
-                        """
-                    }
-                }
+                sh '''
+                docker build -t $DOCKER_REPO/productcatalogservice:${BUILD_NUMBER} src/productcatalogservice
+                docker build -t $DOCKER_REPO/frontend:${BUILD_NUMBER} src/frontend
+                '''
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: DOCKERHUB_CREDENTIALS,
-                                                 usernameVariable: 'DOCKER_USER',
-                                                 passwordVariable: 'DOCKER_PASS')]) {
-                    sh """
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker push ${IMAGE_NAME}:latest
-                    """
-                }
+                sh '''
+                echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                docker push $DOCKER_REPO/productcatalogservice:${BUILD_NUMBER}
+                docker push $DOCKER_REPO/frontend:${BUILD_NUMBER}
+                '''
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy with Helm') {
             steps {
-                sh """
-                kubectl apply -f ./release/kubernetes-manifests.yaml -n ${K8S_NAMESPACE}
-                """
+                sh '''
+                kubectl config use-context $KUBE_CONTEXT
+                helm upgrade --install $HELM_RELEASE $HELM_CHART_PATH \
+                  --namespace $NAMESPACE \
+                  --set productcatalog.image=$DOCKER_REPO/productcatalogservice:${BUILD_NUMBER} \
+                  --set frontend.image=$DOCKER_REPO/frontend:${BUILD_NUMBER}
+                '''
             }
         }
     }
