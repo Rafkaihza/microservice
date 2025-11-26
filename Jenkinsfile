@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred-id') // id di Jenkins
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub') // id di Jenkins
         DOCKER_REPO = 'rafkaihza78'
         KUBE_CONTEXT = 'minikube'
         HELM_RELEASE = 'onlineboutique'
@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/USERNAME/microservices-demo.git'
+                git branch: 'main', url: 'https://github.com/Rafkaihza/microservices-demo.git'
             }
         }
 
